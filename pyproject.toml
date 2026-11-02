@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asciiforge"
+version = "0.1.0"
+description = "Type a sentence, get ASCII text art in the style you pick."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+dependencies = ["pyfiglet>=1.0"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+asciiforge = "asciiforge.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
