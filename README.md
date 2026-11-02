@@ -1,5 +1,7 @@
 # asciiforge
 
+**[try it in your browser](https://masterxhackerx420-oss.github.io/asciiforge/)**, no install needed.
+
 Type a sentence, get it back as ASCII text art in the style you pick.
 
 ```

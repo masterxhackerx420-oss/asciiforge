@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>asciiforge: ASCII art in your browser</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#0d1117; color:#e6edf3; font:15px/1.4 system-ui, sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:20px; }
+  h1 { font-size:22px; margin:0 0 4px; } p.sub { color:#8b949e; margin:0 0 16px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; align-items:center; }
+  input[type=text], select { background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:6px; padding:10px; font-size:16px; }
+  input[type=text] { flex:1 1 260px; }
+  button { background:#238636; color:#fff; border:0; border-radius:6px; padding:10px 14px; font-size:15px; cursor:pointer; }
+  button.alt { background:#30363d; } button:disabled { opacity:.5; cursor:wait; }
+  label { color:#c9d1d9; user-select:none; }
+  pre#out { background:#010409; border:1px solid #30363d; border-radius:8px; padding:14px; overflow:auto; min-height:120px; font:13px/1.15 ui-monospace, Menlo, Consolas, monospace; white-space:pre; }
+  #status { color:#8b949e; font-size:13px; margin-bottom:8px; }
+  a { color:#58a6ff; }
+</style>
+</head>
+<body>
+<main>
+  <h1>asciiforge</h1>
+  <p class="sub">Type a sentence, get ASCII text art. Runs Python in your browser, no install. <a href="https://github.com/masterxhackerx420-oss/asciiforge">source</a></p>
+  <div class="row">
+    <input id="text" type="text" value="make art" aria-label="text">
+    <select id="font" aria-label="style"></select>
+  </div>
+  <div class="row">
+    <label><input id="border" type="checkbox"> border</label>
+    <button id="go" disabled>render</button>
+    <button id="all" class="alt" disabled>preview all styles</button>
+    <button id="copy" class="alt">copy</button>
+  </div>
+  <div id="status">loading python (pyodide)…</div>
+  <pre id="out"></pre>
+</main>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+<script>
+const SRC = "https://raw.githubusercontent.com/masterxhackerx420-oss/asciiforge/main/src/asciiforge/cli.py";
+const $ = id => document.getElementById(id);
+let py;
+function cols() {  // monospace columns that fit the output box
+  const probe = document.createElement("span"); probe.textContent = "M".repeat(100);
+  probe.style.font = getComputedStyle($("out")).font; probe.style.visibility = "hidden";
+  document.body.appendChild(probe); const w = probe.getBoundingClientRect().width / 100; probe.remove();
+  return Math.max(20, Math.floor(($("out").clientWidth - 28) / w));
+}
+async function boot() {
+  try {
+    py = await loadPyodide();
+    $("status").textContent = "installing pyfiglet…";
+    await py.loadPackage("micropip");
+    await py.runPythonAsync("import micropip; await micropip.install('pyfiglet')");
+    $("status").textContent = "loading asciiforge…";
+    const code = await (await fetch(SRC)).text();
+    py.FS.mkdirTree("/home/pyodide/asciiforge");
+    py.FS.writeFile("/home/pyodide/asciiforge/__init__.py", "");
+    py.FS.writeFile("/home/pyodide/asciiforge/cli.py", code);
+    py.runPython("import sys; sys.path.insert(0,'/home/pyodide'); from asciiforge.cli import render, boxed, STYLES");
+    for (const s of py.globals.get("STYLES").toJs()) $("font").add(new Option(s, s));
+    $("font").value = "slant";
+    $("go").disabled = $("all").disabled = false;
+    $("status").textContent = "ready";
+    draw();
+  } catch (e) { $("status").textContent = "failed to load: " + e; }
+}
+function art(font, width) {
+  const b = $("border").checked;
+  const a = py.globals.get("render")($("text").value.trim() || " ", font, b ? width - 4 : width);
+  return b ? py.globals.get("boxed")(a) : a;
+}
+function draw() { if (py) $("out").textContent = art($("font").value, cols()); }
+$("go").onclick = draw;
+$("text").addEventListener("keydown", e => { if (e.key === "Enter") draw(); });
+$("font").onchange = draw; $("border").onchange = draw;
+$("all").onclick = () => {
+  const w = cols();
+  $("out").textContent = py.globals.get("STYLES").toJs().map(f => `[${f}]\n` + art(f, w)).join("\n\n");
+};
+$("copy").onclick = async () => {
+  try { await navigator.clipboard.writeText($("out").textContent); $("status").textContent = "copied"; }
+  catch { $("status").textContent = "copy failed, select the text manually"; }
+};
+boot();
+</script>
+</body>
+</html>
